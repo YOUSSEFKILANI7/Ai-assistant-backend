@@ -29,6 +29,7 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 - Set `ALLOWED_ORIGINS` to your real frontend origins
 - Never commit `.env` or `firebase-credentials.json`
 - If your hosting platform prefers environment variables, use `FIREBASE_CREDENTIALS_JSON`
+- Configure SMTP settings if you want guardian credentials to be emailed automatically
 
 ## Docker
 

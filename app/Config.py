@@ -15,6 +15,12 @@ class Settings(BaseSettings):
     ENABLE_DOCS: bool = True
     HOST: str = "0.0.0.0"
     PORT: int = 8000
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_EMAIL: str = ""
+    SMTP_USE_TLS: bool = True
 
     @property
     def ALLOWED_ORIGINS(self) -> List[str]:

@@ -3,6 +3,8 @@ from firebase_admin import credentials, firestore, auth
 from app.Config import settings
 import logging
 import json
+import smtplib
+from email.message import EmailMessage
 
 logger = logging.getLogger(__name__)
 
@@ -71,3 +73,108 @@ def get_firebase_user(uid: str):
     except Exception as e:
         logger.error(f"Get user failed: {e}")
         return None
+
+
+def get_firebase_user_by_email(email: str):
+    """Get Firebase user info by email"""
+    try:
+        user = auth.get_user_by_email(email)
+        return {
+            "uid": user.uid,
+            "email": user.email,
+            "display_name": user.display_name,
+            "email_verified": user.email_verified,
+        }
+    except auth.UserNotFoundError:
+        return None
+    except Exception as e:
+        logger.error(f"Get user by email failed: {e}")
+        return None
+
+
+def create_or_update_guardian_auth_user(email: str, password: str):
+    """Create guardian Firebase Auth user, or refresh password if they already exist."""
+    existing_user = get_firebase_user_by_email(email)
+
+    try:
+        if existing_user:
+            user = auth.update_user(existing_user["uid"], password=password)
+        else:
+            user = auth.create_user(email=email, password=password, email_verified=False)
+
+        return {
+            "uid": user.uid,
+            "email": user.email,
+            "display_name": user.display_name,
+            "email_verified": user.email_verified,
+        }
+    except Exception as e:
+        logger.error(f"Create/update guardian auth user failed: {e}")
+        raise
+
+
+def create_or_update_blind_user_auth_user(email: str, password: str):
+    """Create blind user Firebase Auth user, or refresh password if they already exist."""
+    existing_user = get_firebase_user_by_email(email)
+
+    try:
+        if existing_user:
+            user = auth.update_user(existing_user["uid"], password=password)
+        else:
+            user = auth.create_user(email=email, password=password, email_verified=False)
+
+        return {
+            "uid": user.uid,
+            "email": user.email,
+            "display_name": user.display_name,
+            "email_verified": user.email_verified,
+        }
+    except Exception as e:
+        logger.error(f"Create/update blind user auth user failed: {e}")
+        raise
+
+
+def send_guardian_credentials_email(
+    recipient_email: str,
+    blind_user_name: str,
+    login_email: str,
+    temporary_password: str,
+):
+    """Send guardian credentials email if SMTP is configured."""
+    if not all(
+        [
+            settings.SMTP_HOST,
+            settings.SMTP_USERNAME,
+            settings.SMTP_PASSWORD,
+            settings.SMTP_FROM_EMAIL,
+        ]
+    ):
+        logger.warning("SMTP is not configured; skipping guardian credentials email")
+        return False
+
+    message = EmailMessage()
+    message["Subject"] = f"Guardian access for {blind_user_name}"
+    message["From"] = settings.SMTP_FROM_EMAIL
+    message["To"] = recipient_email
+    message.set_content(
+        "\n".join(
+            [
+                f"You have been added as a guardian for {blind_user_name}.",
+                "",
+                "Use these credentials to sign in:",
+                f"Email: {login_email}",
+                f"Password: {temporary_password}",
+            ]
+        )
+    )
+
+    try:
+        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
+            if settings.SMTP_USE_TLS:
+                server.starttls()
+            server.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
+            server.send_message(message)
+        return True
+    except Exception as e:
+        logger.error(f"Send guardian credentials email failed: {e}")
+        return False
